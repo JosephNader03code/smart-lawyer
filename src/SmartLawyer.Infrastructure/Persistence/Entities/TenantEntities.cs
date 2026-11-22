@@ -105,3 +105,25 @@ public sealed class LlmUsage : ITenantOwned
     public decimal CostUsd { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
+
+/// <summary>
+/// ربط المستخدم (من Supabase Auth) بمكتبه. مفيش عليه Row-Level Security لأننا محتاجينه عشان نعرف المكتب أصلاً،
+/// وفيه أرقام بس من غير أي بيانات حساسة.
+/// </summary>
+public sealed class Membership
+{
+    public Guid UserId { get; set; }
+    public Guid OrganizationId { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}
+
+/// <summary>إجابات بحث محفوظة لكل مكتب، عشان السؤال المتكرر مايتحسبش تاني على حد الاستخدام ولا على التكلفة.</summary>
+public sealed class AnswerCacheEntry : ITenantOwned
+{
+    public long Id { get; set; }
+    public Guid OrganizationId { get; set; }
+    public required string QuestionHash { get; set; }
+    public required string Question { get; set; }
+    public required string AnswerJson { get; set; }
+    public DateTimeOffset CreatedAt { get; set; }
+}

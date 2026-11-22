@@ -23,6 +23,51 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.AnswerCacheEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("AnswerJson")
+                        .IsRequired()
+                        .HasColumnType("jsonb")
+                        .HasColumnName("answer_json");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.Property<string>("Question")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("question");
+
+                    b.Property<string>("QuestionHash")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("question_hash");
+
+                    b.HasKey("Id")
+                        .HasName("pk_answer_cache");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_answer_cache_organization_id");
+
+                    b.HasIndex("OrganizationId", "QuestionHash")
+                        .IsUnique()
+                        .HasDatabaseName("ix_answer_cache_organization_id_question_hash");
+
+                    b.ToTable("answer_cache", (string)null);
+                });
+
             modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.AppUser", b =>
                 {
                     b.Property<Guid>("Id")
@@ -505,6 +550,30 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                     b.ToTable("llm_usages", (string)null);
                 });
 
+            modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.Membership", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasColumnName("user_id");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("OrganizationId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("organization_id");
+
+                    b.HasKey("UserId")
+                        .HasName("pk_memberships");
+
+                    b.HasIndex("OrganizationId")
+                        .HasDatabaseName("ix_memberships_organization_id");
+
+                    b.ToTable("memberships", (string)null);
+                });
+
             modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.Organization", b =>
                 {
                     b.Property<Guid>("Id")
@@ -638,6 +707,16 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         .HasDatabaseName("ix_usage_quotas_organization_id");
 
                     b.ToTable("usage_quotas", (string)null);
+                });
+
+            modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.AnswerCacheEntry", b =>
+                {
+                    b.HasOne("SmartLawyer.Infrastructure.Persistence.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_answer_cache_organizations_organization_id");
                 });
 
             modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.AppUser", b =>
@@ -791,6 +870,16 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_llm_usages_users_user_id");
+                });
+
+            modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.Membership", b =>
+                {
+                    b.HasOne("SmartLawyer.Infrastructure.Persistence.Entities.Organization", null)
+                        .WithMany()
+                        .HasForeignKey("OrganizationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_memberships_organizations_organization_id");
                 });
 
             modelBuilder.Entity("SmartLawyer.Infrastructure.Persistence.Entities.UsageQuota", b =>

@@ -60,6 +60,17 @@ dotnet run --project src/SmartLawyer.Ingestion -- import-rulings --dir ./rulings
 - **ملف القانون:** كل مادة تبدأ بسطر لوحدها زي `مادة 1` أو `المادة (147)` أو `مادة 18 مكرر (أ)`. لو استوردت نفس القانون تاني بنص معدّل و`--valid-from` أحدث، النسخة القديمة بتتحفظ.
 - **ملف الحكم (ملف لكل حكم):** أول سطر فيه `الطعن رقم 1234 لسنة 85 ق - جلسة 2016/3/14`، وممكن تضيف سطور `الدائرة: ...` و`المبدأ: ...`.
 
+### إعداد البحث بالـ AI
+
+| الإعداد | فين | ملاحظة |
+|---|---|---|
+| `GROQ_API_KEY` | متغير بيئة للـ API | مفتاح Groq المجاني. ماتحطوش في أي ملف في الـ repo |
+| `Llm__Providers__0__AllowsCaseData=true` | متغير بيئة للـ API | **بس** بعد تفعيل Zero Data Retention في حساب Groq |
+| `Supabase__Url` | متغير بيئة للـ API | زي `https://xyz.supabase.co` |
+| `NEXT_PUBLIC_API_URL` | `apps/web/.env.local` | عنوان الـ API، زي `http://localhost:5000` |
+
+بديل من غير أي مفتاح: شغّل [Ollama](https://ollama.com) على جهازك ونزّل نموذج (مثلاً `ollama pull qwen2.5:7b`)، وبعدين `Llm__Providers__1__Enabled=true`.
+
 ## الاختبارات
 
 الـ integration tests محتاجة Postgres، وبتعمل database مؤقتة وتمسحها في الآخر:

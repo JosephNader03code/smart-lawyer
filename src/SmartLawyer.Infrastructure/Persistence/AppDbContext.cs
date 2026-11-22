@@ -24,10 +24,12 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
     public DbSet<CaseClaim> CaseClaims => Set<CaseClaim>();
     public DbSet<UsageQuota> UsageQuotas => Set<UsageQuota>();
     public DbSet<LlmUsage> LlmUsages => Set<LlmUsage>();
+    public DbSet<Membership> Memberships => Set<Membership>();
+    public DbSet<AnswerCacheEntry> AnswerCache => Set<AnswerCacheEntry>();
 
     /// <summary>الجداول اللي عليها Row-Level Security (بأسمائها في Postgres).</summary>
     public static readonly string[] TenantTables =
-        ["users", "cases", "case_documents", "case_events", "case_claims", "usage_quotas", "llm_usages"];
+        ["users", "cases", "case_documents", "case_events", "case_claims", "usage_quotas", "llm_usages", "answer_cache"];
 
     protected override void OnModelCreating(ModelBuilder b)
     {
@@ -67,6 +69,17 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         });
 
         b.Entity<Organization>(e => e.Property(x => x.Name).HasMaxLength(300));
+        b.Entity<Membership>(e =>
+        {
+            e.HasKey(x => x.UserId);
+            e.HasOne<Organization>().WithMany().HasForeignKey(x => x.OrganizationId).OnDelete(DeleteBehavior.Cascade);
+        });
+        b.Entity<AnswerCacheEntry>(e =>
+        {
+            e.ToTable("answer_cache");
+            e.HasIndex(x => new { x.OrganizationId, x.QuestionHash }).IsUnique();
+            e.Property(x => x.AnswerJson).HasColumnType("jsonb");
+        });
         b.Entity<AppUser>(e => e.HasIndex(x => x.Email).IsUnique());
         b.Entity<LegalCase>(e => e.HasIndex(x => new { x.OrganizationId, x.Number }).IsUnique());
         b.Entity<CaseDocument>(e => e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20));
@@ -106,6 +119,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         b.Entity<CaseClaim>().HasQueryFilter(x => x.OrganizationId == tenant.OrganizationId);
         b.Entity<UsageQuota>().HasQueryFilter(x => x.OrganizationId == tenant.OrganizationId);
         b.Entity<LlmUsage>().HasQueryFilter(x => x.OrganizationId == tenant.OrganizationId);
+        b.Entity<AnswerCacheEntry>().HasQueryFilter(x => x.OrganizationId == tenant.OrganizationId);
     }
 
     public override int SaveChanges(bool acceptAllChangesOnSuccess)

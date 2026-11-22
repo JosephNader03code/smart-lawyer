@@ -11,9 +11,13 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
     /// </summary>
     public partial class RowLevelSecurity : Migration
     {
+        // نسخة ثابتة من الجداول وقت الـ migration دي. الجداول الجديدة بتاخد سياساتها في migrations بعدها.
+        private static readonly string[] Tables =
+            ["users", "cases", "case_documents", "case_events", "case_claims", "usage_quotas", "llm_usages"];
+
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            foreach (var table in AppDbContext.TenantTables)
+            foreach (var table in Tables)
             {
                 migrationBuilder.Sql($"""
                     ALTER TABLE {table} ENABLE ROW LEVEL SECURITY;
@@ -41,7 +45,7 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                 ALTER TABLE organizations NO FORCE ROW LEVEL SECURITY;
                 ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;
                 """);
-            foreach (var table in AppDbContext.TenantTables)
+            foreach (var table in Tables)
             {
                 migrationBuilder.Sql($"""
                     DROP POLICY IF EXISTS tenant_isolation ON {table};
