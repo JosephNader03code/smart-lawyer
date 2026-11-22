@@ -96,18 +96,26 @@ smart-lawyer/
 - **ملاحظة:** كل الأرقام في الواجهة (عدد التعارضات، فرق الوقت، أيام التأخير) محسوبة من ملف بيانات تجريبي واحد `apps/web/src/lib/mock-data.ts`، عشان الأقسام ماتتعارضش مع بعض. المحاكي وقاعدة المعرفة متعلّمين «قريباً».
 
 ### M2 — الـ Database والبيانات القانونية
-- [ ] Schema:
+- [x] Schema (EF Core migrations، أسماء الجداول snake_case):
   - `laws`, `articles`, `article_versions (valid_from, valid_to)`
-  - `rulings (court, appeal_no, judicial_year, session_date, chamber, principle, text)`
-  - `citations (ruling_id → article_id / ruling_id)`
-  - `cases`, `documents`, `events`, `claims`
-  - `users`, `organizations`, `usage_quota`, `llm_usage`
-- [ ] Row-Level Security لبيانات القضايا
-- [ ] `ArabicNormalizer`: توحيد الألف، الياء، التاء المربوطة (في الفهرس بس)، حذف التشكيل والتطويل، تحويل الأرقام الهندية
-- [ ] Ingestion: استخراج النص من PDF ← تقسيم القانون لمواد ← تقسيم الحكم لحقوله
-- [ ] Full-Text Search index + بحث برقم المادة / رقم الطعن
-- **البيانات:** القانون المدني، التجارة، المرافعات + أول دفعة أحكام نقض (من مصادر مسموح باستخدامها فقط — بنراجع شروط كل مصدر قبل الاستخدام).
-- **يخلص لما:** البحث بكلمة أو برقم مادة يرجّع النتيجة الصح، والـ tests بتغطي الـ normalizer والتقسيم.
+  - `rulings (court, appeal_number, judicial_year, session_date, chamber, principle, text)`
+  - `citations (ruling → article أو ruling)`
+  - `organizations`, `users`, `cases`, `case_documents`, `case_events`, `case_claims`, `usage_quotas`, `llm_usages`
+- [x] عزل المكاتب على مستويين: فلاتر EF + منع الكتابة لمكتب تاني، و Row-Level Security في Postgres (`app.current_org`)
+- [x] `ArabicNormalizer`: توحيد الألف، الياء، التاء المربوطة، الهمزات (في الفهرس بس)، حذف التشكيل والتطويل، تحويل الأرقام الهندية
+- [x] تقسيم نص القانون لمواد (بما فيها «مكرر») واستخراج رقم الطعن والسنة وتاريخ الجلسة من الأحكام
+- [x] نسخ المواد حسب تاريخ السريان: إعادة استيراد نص معدّل بتقفل النسخة القديمة وتضيف الجديدة
+- [x] Full-Text Search (GIN) + بحث مباشر برقم المادة / رقم الطعن
+- [x] أداة استيراد (`SmartLawyer.Ingestion`): `migrate`، `import-law`، `import-rulings`
+- [x] API: `/api/legal/articles/search`، `/api/legal/laws/{id}/articles/{number}`، `/api/legal/rulings/search`، `/api/legal/rulings/{appeal}/{year}`
+- [x] Integration tests على Postgres حقيقي (CI فيه Postgres service)
+- [ ] **استيراد البيانات الحقيقية:** القانون المدني، التجارة، المرافعات + أول دفعة أحكام نقض — **مستني الملفات من صاحب المشروع** (من مصادر مسموح باستخدامها فقط)
+- [ ] استخراج الاستشهادات (حكم ← مادة) تلقائياً من نص الأحكام — اتأجل لـ M3 مع ربط أسماء القوانين
+- **يخلص لما:** البحث بكلمة أو برقم مادة يرجّع النتيجة الصح على البيانات الحقيقية.
+- **ملاحظات تشغيل مهمة:**
+  - Row-Level Security مابيتطبقش على superuser أو أي role عنده `BYPASSRLS`. في Supabase لازم نعمل role مخصص للـ API (`NOSUPERUSER NOBYPASSRLS`) والـ API يتصل بيه، والـ migrations بس هي اللي تتشغل بالـ role الرئيسي.
+  - ملفات `.txt` مفضّلة للاستيراد. استخراج النص العربي من PDF ممكن يطلع بترتيب حروف غلط حسب طريقة إنشاء الملف، فلازم مراجعة عينة قبل استيراد PDFs كتير.
+  - endpoints البيانات القانونية مفتوحة من غير تسجيل دخول لحد M3 (بيانات عامة). الـ API مابيكشفش أي بيانات قضايا لحد ما ربط الـ JWT يتعمل.
 
 ### M3 — البحث القانوني والـ Research Agent
 - [ ] Tools (كلها من قاعدة البيانات، مش من الإنترنت):
