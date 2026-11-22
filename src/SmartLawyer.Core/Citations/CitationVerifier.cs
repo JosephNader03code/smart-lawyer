@@ -12,13 +12,17 @@ public sealed record VerificationResult(
 /// بيتأكد إن إجابة النموذج مستندة لمصادر حقيقية:
 /// 1) لازم يكون فيها استشهاد واحد على الأقل.
 /// 2) كل استشهاد لازم يكون لمصدر النموذج جابه فعلاً من قاعدة البيانات في نفس الجلسة.
-/// 3) أي نص مقتبس «...» بعد الاستشهاد لازم يكون موجود حرفياً (بعد التوحيد) في نص المصدر.
+/// 3) أي نص مقتبس «...» بعد الاستشهاد لازم يكون موجود حرفياً (بعد التوحيد) في نص المصدر ده.
+/// 4) أي اقتباس «...» تاني في الإجابة (قبل الاستشهاد مثلاً) لازم يكون موجود حرفياً في واحد من المصادر اللي اتجابت.
 /// </summary>
 public static partial class CitationVerifier
 {
     // [[article:12:147]] أو [[article:12:18 مكرر (أ)]] أو [[ruling:1234:85]]، ممكن بعدها اقتباس «...».
     [GeneratedRegex(@"\[\[(?<kind>article|ruling)\s*:\s*(?<a>[^:\]]+?)\s*:\s*(?<b>[^\]]+?)\s*\]\](?:\s*«(?<quote>[^»]{1,1000})»)?")]
     private static partial Regex CitationPattern();
+
+    [GeneratedRegex(@"«(?<quote>[^»]{1,1000})»")]
+    private static partial Regex AnyQuote();
 
     public static IReadOnlyList<Citation> Parse(string answer)
     {
@@ -55,6 +59,17 @@ public static partial class CitationVerifier
             if (c.Quote is not null && !QuoteAppearsIn(c.Quote, source.Text))
             {
                 problems.Add($"الاقتباس «{c.Quote}» مش موجود في نص {c.Key}.");
+            }
+        }
+
+        // الاقتباسات اللي مش لازقة في استشهاد: لازم تكون من أي مصدر اتجاب.
+        var checkedQuotes = citations.Where(c => c.Quote is not null).Select(c => c.Quote!).ToHashSet();
+        foreach (Match m in AnyQuote().Matches(ArabicNormalizer.NormalizeDigits(answer)))
+        {
+            var quote = m.Groups["quote"].Value.Trim();
+            if (!checkedQuotes.Contains(quote) && !fetched.Values.Any(f => QuoteAppearsIn(quote, f.Text)))
+            {
+                problems.Add($"الاقتباس «{quote}» مش موجود في أي مصدر من المصادر.");
             }
         }
 

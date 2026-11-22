@@ -63,6 +63,16 @@ public class CitationVerifierTests
         Assert.Contains("الاقتباس", result.Problems.Single());
     }
 
+    [Fact]
+    public void Verify_ChecksQuotesPlacedBeforeTheCitation()
+    {
+        Assert.True(CitationVerifier.Verify("**«العقد شريعة المتعاقدين»**[[article:12:147]]", Fetched).IsValid);
+
+        var invented = CitationVerifier.Verify("**«يجوز للمدين تعديل العقد وحده»**[[article:12:147]]", Fetched);
+        Assert.False(invented.IsValid);
+        Assert.Contains("مش موجود في أي مصدر", invented.Problems.Single());
+    }
+
     [Theory]
     [InlineData("المتعاقدين، فلا", true)]
     [InlineData("شريعه المتعاقدين", true)]
