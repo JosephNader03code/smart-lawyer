@@ -1,0 +1,12 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/SmartLawyer.Api/SmartLawyer.Api.csproj" />
+    <Project Path="src/SmartLawyer.Core/SmartLawyer.Core.csproj" />
+    <Project Path="src/SmartLawyer.Infrastructure/SmartLawyer.Infrastructure.csproj" />
+    <Project Path="src/SmartLawyer.Ingestion/SmartLawyer.Ingestion.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/SmartLawyer.Api.Tests/SmartLawyer.Api.Tests.csproj" />
+    <Project Path="tests/SmartLawyer.Core.Tests/SmartLawyer.Core.Tests.csproj" />
+  </Folder>
+</Solution>

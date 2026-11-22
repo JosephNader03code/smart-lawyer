@@ -47,7 +47,7 @@
 smart-lawyer/
 ├── PLAN.md                         ← الملف ده
 ├── README.md                       ← تشغيل المشروع محلياً
-├── SmartLawyer.sln
+├── SmartLawyer.slnx
 ├── src/
 │   ├── SmartLawyer.Api/            ← ASP.NET Core Web API (controllers/endpoints, auth, quotas)
 │   ├── SmartLawyer.Core/           ← Domain + الخوارزميات (من غير أي dependency خارجي)
@@ -78,10 +78,11 @@ smart-lawyer/
 كل milestone بيتسلم بـ: كود على الـ repo + tests ناجحة في CI + ملخص للي اتعمل. **مفيش بدء في milestone جديد قبل موافقة صاحب المشروع.**
 
 ### M0 — الإعداد
-- [ ] Solution و projects حسب الهيكل فوق
-- [ ] `.gitignore`، `.editorconfig`، `.env.example`، `README.md`
-- [ ] GitHub Actions: `dotnet build` + `dotnet test` + lint للـ web
-- [ ] `docker-compose.yml` للتشغيل المحلي (Postgres)
+- [x] Solution و projects حسب الهيكل فوق
+- [x] `.gitignore`، `.editorconfig`، `.env.example`، `README.md`
+- [x] GitHub Actions: `dotnet build` + `dotnet test` (الـ lint بتاع الـ web هيتضاف مع M1)
+- [x] `docker-compose.yml` للتشغيل المحلي (Postgres)
+- [x] Endpoint `/health` + أول integration test
 - **يخلص لما:** الـ CI أخضر على أول push.
 
 ### M1 — الـ Frontend
