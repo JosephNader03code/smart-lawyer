@@ -23,6 +23,22 @@ dotnet run --project src/SmartLawyer.Api
 
 اختبر إن الـ API شغال: `GET http://localhost:5000/health`
 
+### الـ Frontend
+
+```bash
+cd apps/web
+```
+
+```bash
+npm install
+```
+
+```bash
+npm run dev
+```
+
+افتح `http://localhost:3000`. من غير مفاتيح Supabase في `apps/web/.env.local` الموقع بيشتغل في وضع التطوير من غير تسجيل دخول.
+
 ## الاختبارات
 
 ```bash
