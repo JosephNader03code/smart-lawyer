@@ -38,6 +38,10 @@ static void MapLegalEndpoints(WebApplication app)
 
     legal.MapGet("/articles/search", async (string q, string? asOf, int? limit, LegalSearchService search, CancellationToken ct) =>
     {
+        if (ValidateQuery(q) is { } invalid)
+        {
+            return invalid;
+        }
         if (!TryParseDate(asOf, out var date))
         {
             return Results.BadRequest(new { error = "asOf لازم يكون بالشكل yyyy-MM-dd" });
@@ -56,7 +60,7 @@ static void MapLegalEndpoints(WebApplication app)
     });
 
     legal.MapGet("/rulings/search", async (string q, int? yearFrom, int? yearTo, int? limit, LegalSearchService search, CancellationToken ct) =>
-        Results.Ok(await search.SearchRulingsAsync(q, yearFrom, yearTo, limit ?? 10, ct)));
+        ValidateQuery(q) ?? Results.Ok(await search.SearchRulingsAsync(q, yearFrom, yearTo, limit ?? 10, ct)));
 
     legal.MapGet("/rulings/{appealNumber:int}/{judicialYear:int}", async (int appealNumber, int judicialYear, Court? court, LegalSearchService search, CancellationToken ct) =>
     {
@@ -64,6 +68,11 @@ static void MapLegalEndpoints(WebApplication app)
         return ruling is null ? Results.NotFound() : Results.Ok(ruling);
     });
 }
+
+static IResult? ValidateQuery(string q) =>
+    q.Length > LegalSearchService.MaxQueryLength
+        ? Results.BadRequest(new { error = $"السؤال أطول من {LegalSearchService.MaxQueryLength} حرف" })
+        : null;
 
 static bool TryParseDate(string? value, out DateOnly? date)
 {

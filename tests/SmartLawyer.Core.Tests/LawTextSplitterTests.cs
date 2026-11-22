@@ -57,4 +57,50 @@ public class LawTextSplitterTests
     [Fact]
     public void Split_ReturnsEmptyWhenNoHeadings() =>
         Assert.Empty(LawTextSplitter.Split("نص من غير مواد"));
+
+    [Fact]
+    public void Split_ReadsTextOnSameLineAsHeading()
+    {
+        const string text = """
+            مادة 1 - يلغى القانون رقم 10 لسنة 1990.
+            مادة (2): ينشر هذا القانون في الجريدة الرسمية،
+            ويعمل به من اليوم التالي.
+            """;
+
+        var articles = LawTextSplitter.Split(text);
+
+        Assert.Equal(["1", "2"], articles.Select(a => a.Number));
+        Assert.Equal("يلغى القانون رقم 10 لسنة 1990.", articles[0].Text);
+        Assert.Equal("ينشر هذا القانون في الجريدة الرسمية،\nويعمل به من اليوم التالي.", articles[1].Text);
+    }
+
+    [Fact]
+    public void Split_HandlesOrdinalIssuanceArticles()
+    {
+        const string text = """
+            المادة الأولى
+            يعمل بأحكام القانون المرافق.
+            المادة الثانية
+            ينشر هذا القانون.
+            مادة 1
+            نص المادة الأولى من القانون.
+            """;
+
+        var articles = LawTextSplitter.Split(text);
+
+        Assert.Equal(["الأولى", "الثانية", "1"], articles.Select(a => a.Number));
+    }
+
+    [Fact]
+    public void Split_DoesNotTreatSentenceStartingWithArticleAsHeading()
+    {
+        const string text = """
+            مادة 4
+            يعاقب المخالف.
+            المادة 3 من هذا القانون تسري على الحالات السابقة.
+            """;
+
+        var only = Assert.Single(LawTextSplitter.Split(text));
+        Assert.Contains("المادة 3 من هذا القانون", only.Text);
+    }
 }

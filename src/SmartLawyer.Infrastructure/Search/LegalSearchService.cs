@@ -19,6 +19,7 @@ public sealed record RulingHit(
 public sealed class LegalSearchService(AppDbContext db)
 {
     public const int MaxLimit = 50;
+    public const int MaxQueryLength = 500;
 
     /// <summary>بحث في نصوص المواد اللي كانت سارية في تاريخ asOf (افتراضياً النهارده).</summary>
     public async Task<IReadOnlyList<ArticleHit>> SearchArticlesAsync(

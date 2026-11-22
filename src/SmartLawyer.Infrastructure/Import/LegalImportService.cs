@@ -7,10 +7,15 @@ using SmartLawyer.Infrastructure.Persistence.Entities;
 
 namespace SmartLawyer.Infrastructure.Import;
 
+/// <param name="IsCompleteText">
+/// true لو الملف فيه نص القانون كامل: أي مادة سارية مش موجودة في الملف بتتعتبر ملغية من ValidFrom.
+/// false (الافتراضي) لو الملف فيه المواد المعدلة بس.
+/// </param>
 public sealed record LawImportRequest(
-    string Title, string? Number, int? Year, string? Source, DateOnly ValidFrom, string Text);
+    string Title, string? Number, int? Year, string? Source, DateOnly ValidFrom, string Text, bool IsCompleteText = false);
 
-public sealed record LawImportResult(int LawId, int ArticlesFound, int NewArticles, int NewVersions, int Unchanged);
+public sealed record LawImportResult(
+    int LawId, int ArticlesFound, int NewArticles, int NewVersions, int Unchanged, int Repealed = 0);
 
 public sealed record RulingImportRequest(
     Court Court, string Text, string? Source = null, string? Chamber = null, string? Principle = null);
@@ -82,9 +87,30 @@ public sealed partial class LegalImportService(AppDbContext db)
             newVersions++;
         }
 
+        var repealed = 0;
+        if (request.IsCompleteText)
+        {
+            var present = parsed.Select(a => a.Number).ToHashSet();
+            foreach (var (number, article) in existing)
+            {
+                var open = article.Versions.SingleOrDefault(v => v.ValidTo is null);
+                if (present.Contains(number) || open is null)
+                {
+                    continue;
+                }
+                if (request.ValidFrom <= open.ValidFrom)
+                {
+                    throw new InvalidOperationException(
+                        $"المادة {number} مش موجودة في النص الكامل، وتاريخ الإلغاء لازم يكون بعد {open.ValidFrom:yyyy-MM-dd}.");
+                }
+                open.ValidTo = request.ValidFrom.AddDays(-1);
+                repealed++;
+            }
+        }
+
         await db.SaveChangesAsync(ct);
         await tx.CommitAsync(ct);
-        return new LawImportResult(law.Id, parsed.Count, newArticles, newVersions, unchanged);
+        return new LawImportResult(law.Id, parsed.Count, newArticles, newVersions, unchanged, repealed);
     }
 
     public async Task<RulingImportResult> ImportRulingAsync(RulingImportRequest request, CancellationToken ct = default)

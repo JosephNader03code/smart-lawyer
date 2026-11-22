@@ -23,10 +23,24 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         WITH CHECK (organization_id = NULLIF(current_setting('app.current_org', true), '')::uuid);
                     """);
             }
+
+            // المكتب يشوف بياناته هو بس في جدول المكاتب كمان (العمود اسمه id مش organization_id).
+            migrationBuilder.Sql("""
+                ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+                ALTER TABLE organizations FORCE ROW LEVEL SECURITY;
+                CREATE POLICY tenant_isolation ON organizations
+                    USING (id = NULLIF(current_setting('app.current_org', true), '')::uuid)
+                    WITH CHECK (id = NULLIF(current_setting('app.current_org', true), '')::uuid);
+                """);
         }
 
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.Sql("""
+                DROP POLICY IF EXISTS tenant_isolation ON organizations;
+                ALTER TABLE organizations NO FORCE ROW LEVEL SECURITY;
+                ALTER TABLE organizations DISABLE ROW LEVEL SECURITY;
+                """);
             foreach (var table in AppDbContext.TenantTables)
             {
                 migrationBuilder.Sql($"""

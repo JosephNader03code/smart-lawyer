@@ -33,5 +33,7 @@ public class LegalEndpointsTests(DatabaseFixture fx) : IClassFixture<DatabaseFix
 
         Assert.Equal(HttpStatusCode.NotFound, (await client.GetAsync($"/api/legal/laws/{lawId}/articles/99")).StatusCode);
         Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync($"/api/legal/laws/{lawId}/articles/1?asOf=1-1-2024")).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/legal/articles/search?q=" + new string('ا', 501))).StatusCode);
+        Assert.Equal(HttpStatusCode.BadRequest, (await client.GetAsync("/api/legal/rulings/search?q=" + new string('ا', 501))).StatusCode);
     }
 }

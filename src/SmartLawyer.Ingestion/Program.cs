@@ -11,7 +11,7 @@ using UglyToad.PdfPig;
 
 // أداة استيراد القوانين والأحكام. أمثلة:
 //   dotnet run --project src/SmartLawyer.Ingestion -- migrate
-//   dotnet run --project src/SmartLawyer.Ingestion -- import-law --file civil.txt --title "القانون المدني" --number 131 --year 1948 --valid-from 1949-10-15
+//   dotnet run --project src/SmartLawyer.Ingestion -- import-law --file civil.txt --title "القانون المدني" --number 131 --year 1948 --valid-from 1949-10-15 [--complete true]
 //   dotnet run --project src/SmartLawyer.Ingestion -- import-rulings --dir ./rulings --court cassation
 Console.OutputEncoding = Encoding.UTF8;
 
@@ -53,8 +53,9 @@ try
                 Year: options.TryGetValue("year", out var y) ? int.Parse(y, CultureInfo.InvariantCulture) : null,
                 Source: options.GetValueOrDefault("source"),
                 ValidFrom: DateOnly.ParseExact(Required(options, "valid-from"), "yyyy-MM-dd", CultureInfo.InvariantCulture),
-                Text: text));
-            Console.WriteLine($"القانون #{result.LawId}: {result.ArticlesFound} مادة — جديدة {result.NewArticles}، نسخ معدلة {result.NewVersions}، بدون تغيير {result.Unchanged}.");
+                Text: text,
+                IsCompleteText: options.GetValueOrDefault("complete") == "true"));
+            Console.WriteLine($"القانون #{result.LawId}: {result.ArticlesFound} مادة — جديدة {result.NewArticles}، نسخ معدلة {result.NewVersions}، بدون تغيير {result.Unchanged}، ملغية {result.Repealed}.");
             return 0;
         }
 

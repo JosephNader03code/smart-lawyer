@@ -82,4 +82,16 @@ public class TenantIsolationTests(DatabaseFixture fx) : IClassFixture<DatabaseFi
         var ex = await Assert.ThrowsAsync<PostgresException>(() => insert.ExecuteNonQueryAsync());
         Assert.Equal("42501", ex.SqlState); // insufficient_privilege (row-level security)
     }
+
+    [Fact]
+    public async Task Office_CannotSeeOtherOfficesInOrganizationsTable()
+    {
+        var (orgA, orgB) = await SeedAsync();
+        await using var b = fx.CreateContext(orgB, asAppRole: true);
+
+        var visible = await b.Organizations.Select(o => o.Id).ToListAsync();
+
+        Assert.Equal([orgB], visible);
+        Assert.DoesNotContain(orgA, visible);
+    }
 }

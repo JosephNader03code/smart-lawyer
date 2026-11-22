@@ -77,6 +77,26 @@ public class LegalDataTests(DatabaseFixture fx) : IClassFixture<DatabaseFixture>
     }
 
     [Fact]
+    public async Task ImportCompleteLaw_MarksMissingArticlesAsRepealed()
+    {
+        var lawId = await ImportSampleLawAsync("قانون تجريبي للإلغاء", new DateOnly(2000, 1, 1), SampleLaw);
+        var withoutArticle2 = "مادة 1\nيلتزم المورد بتسليم البضاعة في الموعد المتفق عليه في العقد.\nمادة 3 مكرراً\nيُقدَّر التعويض بقدر الضرر الذي لحق الدائن.";
+
+        await using (var db = fx.CreateContext(null))
+        {
+            var r = await new LegalImportService(db).ImportLawAsync(new LawImportRequest(
+                "قانون تجريبي للإلغاء", null, null, null, new DateOnly(2022, 1, 1), withoutArticle2, IsCompleteText: true));
+            Assert.Equal(1, r.Repealed);
+        }
+
+        await using var read = fx.CreateContext(null);
+        var search = new LegalSearchService(read);
+        Assert.NotNull(await search.GetArticleAsync(lawId, "2", new DateOnly(2021, 12, 31)));
+        Assert.Null(await search.GetArticleAsync(lawId, "2", new DateOnly(2022, 1, 1)));
+        Assert.NotNull(await search.GetArticleAsync(lawId, "1", new DateOnly(2022, 1, 1)));
+    }
+
+    [Fact]
     public async Task ImportRuling_ParsesHeader_AndCanBeFoundBySearchAndReference()
     {
         const string ruling = """

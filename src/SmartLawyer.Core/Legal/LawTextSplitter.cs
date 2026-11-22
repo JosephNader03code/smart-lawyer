@@ -5,31 +5,65 @@ namespace SmartLawyer.Core.Legal;
 
 /// <summary>
 /// تقسيم نص قانون لمواد. بيتعرف على عناوين زي:
-/// "مادة 1"، "المادة (147)"، "مادة ١٤٧ مكرراً"، "مادة 18 مكرر (أ)"، و"مادة 1 -".
-/// العنوان لازم يبقى في أول السطر عشان مايتلخبطش مع "طبقاً للمادة 5" في نص مادة تانية.
+/// "مادة 1"، "المادة (147)"، "مادة ١٤٧ مكرراً"، "مادة 18 مكرر (أ)"، "(مادة 5)"،
+/// "مادة 1 - نص المادة على نفس السطر"، و"المادة الأولى" (مواد الإصدار).
+/// العنوان لازم يبقى في أول السطر عشان مايتلخبطش مع "طبقاً للمادة 5" في نص مادة تانية،
+/// ولو بعده نص على نفس السطر لازم يتفصل بشرطة أو نقطتين.
 /// </summary>
 public static partial class LawTextSplitter
 {
     [GeneratedRegex(
-        @"^[ \t]*(?:ال)?مادة[ \t]*\(?[ \t]*(?<num>\d+)[ \t]*\)?(?<suffix>[ \t]*مكرر[اً]*(?:[ \t]*\(?[ \t]*(?<letter>[أ-ي])[ \t]*\)?)?)?[ \t]*[-–:.]?[ \t]*$",
-        RegexOptions.Multiline)]
-    private static partial Regex ArticleHeading();
+        @"^\s*\(?\s*(?:ال)?مادة\s*\(?\s*(?<num>\d+)\s*\)?(?<suffix>\s*مكرر[اً]*(?:\s*\(?\s*(?<letter>[أ-ي])\s*\)?)?)?\s*\)?\s*(?:[-–—:.]\s*(?<rest>.*?))?\s*$")]
+    private static partial Regex NumericHeading();
+
+    // مواد الإصدار بتتكتب بالحروف. المقارنة بتتم على النص بعد التوحيد (الاولي، الثانيه، ...).
+    [GeneratedRegex(
+        @"^\(?\s*(?:ال)?ماده\s+(?<ord>(?:الحاديه|الثانيه|الثالثه|الرابعه|الخامسه|السادسه|السابعه|الثامنه|التاسعه|الاولي|العاشره)(?:\s+عشره?)?|العشرون)\s*\)?\s*[-:.]?$")]
+    private static partial Regex OrdinalHeading();
 
     public static IReadOnlyList<LawArticle> Split(string lawText)
     {
         ArgumentNullException.ThrowIfNull(lawText);
-        var text = ArabicNormalizer.NormalizeDigits(lawText).Replace("\r\n", "\n");
-        var matches = ArticleHeading().Matches(text);
-        var articles = new List<LawArticle>(matches.Count);
+        var lines = ArabicNormalizer.NormalizeDigits(lawText).Replace("\r\n", "\n").Split('\n');
+        var articles = new List<LawArticle>();
+        string? number = null;
+        var body = new List<string>();
 
-        for (var i = 0; i < matches.Count; i++)
+        void Flush()
         {
-            var m = matches[i];
-            var start = m.Index + m.Length;
-            var end = i + 1 < matches.Count ? matches[i + 1].Index : text.Length;
-            var body = text[start..end].Trim();
+            if (number is not null)
+            {
+                articles.Add(new LawArticle(number, string.Join("\n", body).Trim()));
+            }
+            body.Clear();
+        }
 
-            var number = m.Groups["num"].Value;
+        foreach (var line in lines)
+        {
+            if (TryParseHeading(line, out var heading, out var rest))
+            {
+                Flush();
+                number = heading;
+                if (rest.Length > 0)
+                {
+                    body.Add(rest);
+                }
+            }
+            else if (number is not null)
+            {
+                body.Add(line.Trim());
+            }
+        }
+        Flush();
+        return articles;
+    }
+
+    private static bool TryParseHeading(string line, out string number, out string rest)
+    {
+        var m = NumericHeading().Match(line);
+        if (m.Success)
+        {
+            number = m.Groups["num"].Value;
             if (m.Groups["suffix"].Success)
             {
                 number += " مكرر";
@@ -38,10 +72,23 @@ public static partial class LawTextSplitter
                     number += $" ({m.Groups["letter"].Value})";
                 }
             }
-
-            articles.Add(new LawArticle(number, body));
+            rest = m.Groups["rest"].Value.Trim();
+            return true;
         }
 
-        return articles;
+        var normalized = ArabicNormalizer.NormalizeForSearch(line);
+        var o = OrdinalHeading().Match(normalized);
+        if (o.Success)
+        {
+            // بنرجّع الكلمة زي ما اتكتبت في النص الأصلي (مثلاً "الأولى")، مش الشكل الموحّد.
+            var original = line.Trim().Trim('(', ')').Trim();
+            var idx = original.IndexOf("مادة", StringComparison.Ordinal);
+            number = (idx >= 0 ? original[(idx + "مادة".Length)..] : original).Trim().TrimEnd('-', ':', '.', ')').Trim();
+            rest = "";
+            return true;
+        }
+
+        number = rest = "";
+        return false;
     }
 }
