@@ -48,7 +48,7 @@ public sealed partial class FactExtractor(ILlmClient llm)
         رجّع JSON بس بالشكل ده بالظبط:
         {
           "events": [{"kind": "signing|delivery|notice|incident|payment|hearing|other", "title": "وصف قصير", "date_text": "التاريخ زي ما هو مكتوب في النص حرفياً", "quote": "جملة منقولة حرفياً من النص فيها الحدث"}],
-          "facts": [{"subject": "الشخص أو الجهة", "predicate": "signing|delivery|notice|incident|payment|other", "time_text": "التاريخ والوقت زي ما هما مكتوبين حرفياً أو null", "amount": رقم أو null, "quote": "جملة منقولة حرفياً من النص"}]
+          "facts": [{"subject": "الجهة أو الشيء اللي الواقعة بتخصه (زي الشركة أو الشحنة)، مش الشخص اللي بيحكي", "predicate": "signing|delivery|notice|incident|payment|other", "time_text": "التاريخ والوقت زي ما هما مكتوبين حرفياً أو null", "amount": رقم أو null, "quote": "جملة منقولة حرفياً من النص"}]
         }
         قواعد:
         - الاقتباس (quote) لازم يكون منقول حرفياً من النص من غير أي تعديل. أي اقتباس مش موجود في النص هيترفض.

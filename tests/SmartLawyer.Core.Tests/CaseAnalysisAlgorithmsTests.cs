@@ -151,6 +151,19 @@ public class ContradictionTests
     }
 
     [Fact]
+    public void Detect_ComparesTimesOnSameDayEvenWhenNarratorsDiffer()
+    {
+        // في الاختبار الحقيقي: الشاهد قال 8:00 مساءً والسائق قال 10:30 مساءً عن نفس التسليم.
+        var facts = new[]
+        {
+            F("1", "الشاهد أحمد سعيد", "delivery", new DateTime(2025, 8, 28, 20, 0, 0), null, "شهادة الشاهد"),
+            F("2", "السائق", "delivery", new DateTime(2025, 8, 28, 22, 30, 0), null, "محضر الاستلام"),
+        };
+
+        Assert.Equal(150, Assert.Single(FactContradictionDetector.Detect(facts, TimeSpan.FromMinutes(30))).Difference);
+    }
+
+    [Fact]
     public void Detect_IgnoresSameDocumentDifferentPeopleAndDifferentEvents()
     {
         var t1 = new DateTime(2025, 8, 28, 20, 0, 0);
@@ -159,7 +172,7 @@ public class ContradictionTests
         {
             F("1", "أحمد محمد", "delivery", t1, null, "محضر"),
             F("2", "أحمد محمد", "delivery", t2, null, "محضر"),         // نفس المستند
-            F("3", "محمود حسن", "delivery", t2, null, "شهادة"),        // شخص تاني
+            F("3", "محمود حسن", "delivery", t2.AddDays(1), null, "شهادة"), // شخص تاني في يوم تاني
             F("4", "أحمد محمد", "payment", t2, null, "شهادة"),         // حدث تاني
         };
 

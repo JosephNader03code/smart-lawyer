@@ -1,6 +1,8 @@
 import { AlignRight, CloudUpload, Scale, Sparkles, TriangleAlert } from "lucide-react";
 import { Card, PageHeader, Source } from "@/components/ui";
 import { activeCase, findings } from "@/lib/mock-data";
+import { isApiEnabled } from "@/lib/api";
+import { CaseWorkspace } from "./CaseWorkspace";
 
 const inputClass =
   "w-full rounded-lg border border-slate-800 bg-slate-900 px-3 py-2 text-xs text-slate-200 focus:border-blue-500 focus:outline-none";
@@ -9,6 +11,14 @@ export default function CaseAnalysisPage() {
   return (
     <section className="space-y-6">
       <PageHeader title="محرك تحليل القضايا" subtitle="ادخل بيانات القضية وارفع المستندات لاستخراج الوقائع وتحليلها." />
+      {isApiEnabled ? <CaseWorkspace /> : <DemoAnalysis />}
+    </section>
+  );
+}
+
+function DemoAnalysis() {
+  return (
+    <>
 
       <Card className="space-y-4 p-6">
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -84,6 +94,6 @@ export default function CaseAnalysisPage() {
           </Card>
         </div>
       </div>
-    </section>
+    </>
   );
 }

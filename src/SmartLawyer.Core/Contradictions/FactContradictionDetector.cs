@@ -13,7 +13,10 @@ public sealed record FactContradiction(ContradictionKind Kind, Fact First, Fact 
 
 /// <summary>
 /// كشف التناقضات الرقمية والزمنية بين المستندات بحساب ثابت.
-/// بنقارن بس الوقائع اللي عن نفس الحدث (blocking بالـ predicate) ونفس الشخص (مطابقة أسماء)، ومن مستندات مختلفة.
+/// بنقارن بس الوقائع اللي عن نفس النوع من الأحداث (blocking بالـ predicate)، ومن مستندات مختلفة:
+/// - الأوقات: لو نفس الجهة (مطابقة أسماء) أو نفس اليوم، لأن نفس النوع من الوقائع في نفس اليوم والقضية غالباً نفس الواقعة
+///   حتى لو كل مستند سمّى صاحبها بشكل مختلف (الشاهد، السائق، الشركة...).
+/// - المبالغ: لازم نفس الجهة، لأن مبالغ مختلفة لجهات مختلفة طبيعية.
 /// </summary>
 public static class FactContradictionDetector
 {
@@ -31,12 +34,13 @@ public static class FactContradictionDetector
                 for (var j = i + 1; j < items.Count; j++)
                 {
                     var (a, b) = (items[i], items[j]);
-                    if (a.SourceDocument == b.SourceDocument || !NameMatcher.AreSame(a.Subject, b.Subject))
+                    if (a.SourceDocument == b.SourceDocument)
                     {
                         continue;
                     }
+                    var sameSubject = NameMatcher.AreSame(a.Subject, b.Subject);
 
-                    if (a.Time is { } ta && b.Time is { } tb)
+                    if (a.Time is { } ta && b.Time is { } tb && (sameSubject || ta.Date == tb.Date))
                     {
                         var diff = Math.Abs((tb - ta).TotalMinutes);
                         if (diff > timeTolerance.TotalMinutes)
@@ -46,7 +50,7 @@ public static class FactContradictionDetector
                         }
                     }
 
-                    if (a.Amount is { } ma && b.Amount is { } mb && Math.Abs(ma - mb) > amountTolerance)
+                    if (sameSubject && a.Amount is { } ma && b.Amount is { } mb && Math.Abs(ma - mb) > amountTolerance)
                     {
                         results.Add(new(ContradictionKind.Amount, a, b, (double)Math.Abs(ma - mb),
                             $"«{a.SourceDocument}» و«{b.SourceDocument}» مختلفين في مبلغ نفس الواقعة ({ma:N2} مقابل {mb:N2})."));
