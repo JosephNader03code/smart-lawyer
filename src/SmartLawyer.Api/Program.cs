@@ -19,6 +19,7 @@ builder.Services.AddSupabaseAuth(supabase);
 var llmOptions = builder.Configuration.GetSection(LlmOptions.Section).Get<LlmOptions>() ?? new LlmOptions();
 builder.Services.AddLlm(llmOptions);
 builder.Services.AddSingleton(builder.Configuration.GetSection(QuotaOptions.Section).Get<QuotaOptions>() ?? new QuotaOptions());
+builder.Services.AddSingleton(builder.Configuration.GetSection(ResearchOptions.Section).Get<ResearchOptions>() ?? new ResearchOptions());
 
 var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>() ?? [];
 builder.Services.AddCors(o => o.AddDefaultPolicy(p => p.WithOrigins(allowedOrigins).AllowAnyHeader().AllowAnyMethod()));

@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
 using SmartLawyer.Infrastructure.Import;
 using SmartLawyer.Infrastructure.Llm;
@@ -23,7 +24,10 @@ public static class DependencyInjection
         services.AddScoped<AccountService>();
         services.AddScoped<LegalSearchService>();
         services.AddScoped<LegalImportService>();
-        services.AddScoped<ResearchAgent>();
+        services.TryAddSingleton(new ResearchOptions());
+        services.AddScoped(sp => new ResearchAgent(
+            sp.GetRequiredService<ILlmClient>(), sp.GetRequiredService<LegalSearchService>(),
+            sp.GetRequiredService<ResearchOptions>().Mode));
         services.AddScoped<ResearchService>();
         services.AddSingleton(TimeProvider.System);
         return services;

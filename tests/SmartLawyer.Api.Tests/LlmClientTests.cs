@@ -105,3 +105,50 @@ public class LlmClientTests
         Assert.Empty(backup.Requests);
     }
 }
+
+public class RateLimitTests
+{
+    private sealed class SequenceHandler(params HttpResponseMessage[] responses) : HttpMessageHandler
+    {
+        private int _i;
+        public int Calls => _i;
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct) =>
+            Task.FromResult(responses[Math.Min(_i++, responses.Length - 1)]);
+    }
+
+    private const string Ok = """{"choices":[{"message":{"content":"تمام"}}],"usage":{"prompt_tokens":1,"completion_tokens":1}}""";
+
+    private static HttpResponseMessage Limited(string wait) => new(System.Net.HttpStatusCode.TooManyRequests)
+    {
+        Content = new StringContent($$$"""{"error":{"message":"Rate limit reached. Please try again in {{{wait}}}."}}"""),
+    };
+
+    private static SmartLawyer.Infrastructure.Llm.OpenAiCompatibleClient Client(HttpMessageHandler h) =>
+        new(new HttpClient(h), new() { Name = "groq", BaseUrl = "https://x.example/v1", Model = "m" }, "k");
+
+    private static SmartLawyer.Infrastructure.Llm.LlmRequest Req() =>
+        new("s", [SmartLawyer.Infrastructure.Llm.LlmMessage.User("q")], false);
+
+    [Fact]
+    public async Task ShortRateLimit_IsRetriedAfterWaiting()
+    {
+        var h = new SequenceHandler(Limited("300ms"), new HttpResponseMessage(System.Net.HttpStatusCode.OK) { Content = new StringContent(Ok) });
+        Assert.Equal("تمام", (await Client(h).CompleteAsync(Req())).Content);
+        Assert.Equal(2, h.Calls);
+    }
+
+    [Fact]
+    public async Task LongRateLimit_IsNotWaitedFor()
+    {
+        var h = new SequenceHandler(Limited("8m30s"));
+        await Assert.ThrowsAsync<SmartLawyer.Infrastructure.Llm.LlmProviderException>(() => Client(h).CompleteAsync(Req()));
+        Assert.Equal(1, h.Calls);
+    }
+
+    [Theory]
+    [InlineData("Please try again in 352.5ms.", 352.5)]
+    [InlineData("Please try again in 17.168s.", 17168)]
+    public void ParseRetryAfter_ReadsGroqMessage(string body, double ms) =>
+        Assert.Equal(TimeSpan.FromMilliseconds(ms),
+            SmartLawyer.Infrastructure.Llm.OpenAiCompatibleClient.ParseRetryAfter(new HttpResponseMessage(), body));
+}

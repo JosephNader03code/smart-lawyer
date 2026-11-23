@@ -11,7 +11,28 @@ public sealed class OpenAiCompatibleClient(HttpClient http, LlmProviderOptions p
 {
     public LlmProviderOptions Provider { get; } = provider;
 
+    /// <summary>لو المزوّد طلب انتظار قصير (حد الدقيقة)، بنستنى ونعيد بدل ما نفشل.</summary>
+    public static readonly TimeSpan MaxRateLimitWait = TimeSpan.FromSeconds(30);
+    public const int MaxRateLimitRetries = 4;
+
     public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken ct = default)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return await SendOnceAsync(request, ct);
+            }
+            catch (LlmProviderException ex) when (ex.Status == HttpStatusCode.TooManyRequests
+                                                  && attempt < MaxRateLimitRetries
+                                                  && ex.RetryAfter is { } wait && wait <= MaxRateLimitWait)
+            {
+                await Task.Delay(wait + TimeSpan.FromMilliseconds(250), ct);
+            }
+        }
+    }
+
+    private async Task<LlmResponse> SendOnceAsync(LlmRequest request, CancellationToken ct)
     {
         var body = BuildBody(request);
         using var message = new HttpRequestMessage(HttpMethod.Post, Provider.BaseUrl.TrimEnd('/') + "/chat/completions")
@@ -29,7 +50,8 @@ public sealed class OpenAiCompatibleClient(HttpClient http, LlmProviderOptions p
         var json = await response.Content.ReadAsStringAsync(cts.Token);
         if (!response.IsSuccessStatusCode)
         {
-            throw new LlmProviderException(Provider.Name, response.StatusCode, Truncate(json, 500));
+            throw new LlmProviderException(Provider.Name, response.StatusCode, Truncate(json, 500),
+                ParseRetryAfter(response, json));
         }
         return ParseResponse(json);
     }
@@ -124,12 +146,29 @@ public sealed class OpenAiCompatibleClient(HttpClient http, LlmProviderOptions p
     }
 
     private static string Truncate(string s, int max) => s.Length <= max ? s : s[..max];
+
+    /// <summary>من هيدر Retry-After، أو من رسالة زي "Please try again in 352.5ms" / "in 17.1s".</summary>
+    public static TimeSpan? ParseRetryAfter(HttpResponseMessage response, string body)
+    {
+        if (response.Headers.RetryAfter?.Delta is { } delta)
+        {
+            return delta;
+        }
+        var m = System.Text.RegularExpressions.Regex.Match(body, @"try again in (?<v>[\d.]+)(?<u>ms|s)");
+        if (m.Success && double.TryParse(m.Groups["v"].Value, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out var v))
+        {
+            return m.Groups["u"].Value == "ms" ? TimeSpan.FromMilliseconds(v) : TimeSpan.FromSeconds(v);
+        }
+        return null;
+    }
 }
 
-public sealed class LlmProviderException(string provider, HttpStatusCode status, string body)
+public sealed class LlmProviderException(string provider, HttpStatusCode status, string body, TimeSpan? retryAfter = null)
     : Exception($"{provider} رجّع {(int)status}: {body}")
 {
     public HttpStatusCode Status { get; } = status;
+    public TimeSpan? RetryAfter { get; } = retryAfter;
 
     /// <summary>أخطاء ينفع نجرب بعدها مزوّد تاني: حد الاستخدام، أو مشكلة في السيرفر.</summary>
     public bool IsRetryable => Status == HttpStatusCode.TooManyRequests || (int)Status >= 500;

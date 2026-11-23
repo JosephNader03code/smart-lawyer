@@ -21,15 +21,36 @@ public sealed record ResearchAnswer(
     string? Provider,
     string? Model);
 
+public enum ResearchMode
+{
+    /// <summary>
+    /// «ابحث وبعدين جاوب»: طلب صغير يحوّل السؤال لكلمات بحث، الكود يبحث بنفسه، وطلب واحد للإجابة.
+    /// أقل في الـ tokens بكتير، ومناسب للمزوّدين المجانيين اللي ليهم حد في الدقيقة.
+    /// </summary>
+    Retrieve,
+
+    /// <summary>النموذج بيدوّر بنفسه بالأدوات على كذا خطوة. أدق في الأسئلة المعقدة بس بياخد tokens أكتر.</summary>
+    Agent,
+}
+
+public sealed class ResearchOptions
+{
+    public const string Section = "Research";
+    public ResearchMode Mode { get; set; } = ResearchMode.Retrieve;
+}
+
 /// <summary>
 /// وكيل البحث القانوني: النموذج بيدوّر في قاعدة بياناتنا بس (من خلال tools)، وبعدين يكتب الإجابة باستشهادات.
 /// الإجابة مابتطلعش للمحامي غير لما الـ CitationVerifier يتأكد إن كل مصدر اتجاب فعلاً وإن الاقتباسات حرفية.
 /// لو فشل التحقق، النموذج بياخد فرصة واحدة يصلّح، وبعدها النظام بيقول إنه مش لاقي سند كافي.
 /// </summary>
-public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
+public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search, ResearchMode mode = ResearchMode.Agent)
 {
     public const int MaxSteps = 8;
     public const int MaxRepairAttempts = 1;
+
+    /// <summary>نتائج البحث بتعرض أول جزء من المادة عشان نوفر tokens؛ get_article بيجيب النص كامل.</summary>
+    public const int SearchExcerptLength = 1200;
 
     public const string NoAnswerText =
         "مالقيتش سند كافي في قاعدة البيانات الحالية للإجابة على السؤال ده. جرّب تصيغ السؤال بشكل تاني أو تحدد القانون.";
@@ -81,7 +102,95 @@ public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
             }, "appeal_number", "judicial_year")),
     ];
 
-    public async Task<ResearchAnswer> AskAsync(string question, CancellationToken ct = default)
+    public const string KeywordsPrompt = """
+        حوّل سؤال المحامي لكلمات بحث قانونية بالعربي الفصيح، زي المصطلحات اللي بتتكتب في نصوص القوانين المصرية
+        (مثلاً: «كسر عربية جاري» ← «خطأ ضرر للغير تعويض مسئولية تقصيرية»).
+        اكتب الكلمات بس في سطر واحد، من 4 لـ 12 كلمة، من غير أي شرح.
+        """;
+
+    public const string AnswerPrompt = """
+        أنت باحث قانوني مساعد لمحامين مصريين. جاوب على السؤال من المصادر المرفقة فقط (نصوص قوانين وأحكام من قاعدة البيانات).
+        - ماتعتمدش على معلوماتك العامة عن القانون. لو المصادر المرفقة مش كفاية، قول كده بوضوح.
+        - كل جملة فيها حكم قانوني لازم يكون بعدها مفتاح المصدر بالظبط زي ما هو مكتوب في المصادر، زي [[article:12:147]] أو [[ruling:1234:85]].
+        - لو هتقتبس، حط الاقتباس بين « » بعد المفتاح مباشرة، ولازم يكون منقول حرفياً من نص المصدر.
+        - ماتخترعش أرقام مواد أو أحكام. أي مفتاح مش من المصادر المرفقة هيترفض.
+        - اكتب بالعربي الفصيح المبسط، في نقاط قصيرة، وفي الآخر نبّه إن الإجابة محتاجة مراجعة محامٍ.
+        """;
+
+    public Task<ResearchAnswer> AskAsync(string question, CancellationToken ct = default) =>
+        mode == ResearchMode.Retrieve ? AskRetrieveAsync(question, ct) : AskAgentAsync(question, ct);
+
+    public async Task<ResearchAnswer> AskRetrieveAsync(string question, CancellationToken ct = default)
+    {
+        var usage = new Usage();
+
+        // 1) كلمات بحث قانونية. سؤال المحامي ممكن يكون فيه تفاصيل قضية، فبيتعامل كبيانات قضايا.
+        var kw = await llm.CompleteAsync(new LlmRequest(KeywordsPrompt, [LlmMessage.User(question)], ContainsCaseData: true, MaxTokens: 800), ct);
+        usage.Add(kw);
+        var keywords = string.IsNullOrWhiteSpace(kw.Content) ? question : kw.Content.Trim();
+
+        // 2) البحث بالكود: بالكلمات القانونية وبنص السؤال نفسه.
+        var fetched = new Dictionary<SourceKey, FetchedSource>();
+        var byKeywords = await search.SearchArticlesAsync(keywords, null, 5, ct);
+        var byQuestion = await search.SearchArticlesAsync(question, null, 3, ct);
+        var articles = byKeywords.Concat(byQuestion)
+            .GroupBy(h => (h.LawId, h.ArticleNumber)).Select(g => g.First()).Take(7).ToList();
+        var rulings = await search.SearchRulingsAsync(keywords, null, null, 3, ct);
+        if (articles.Count == 0 && rulings.Count == 0)
+        {
+            return usage.NoAnswer(["البحث مارجّعش أي مادة أو حكم."]);
+        }
+        var sources = FormatArticles(articles, fetched, SearchExcerptLength) + FormatRulings(rulings, fetched);
+
+        // 3) طلب الإجابة + التحقق، وفرصة تصليح واحدة.
+        var messages = new List<LlmMessage> { LlmMessage.User($"السؤال:\n{question}\n\nالمصادر المتاحة (استخدمها بس):\n{sources}") };
+        IReadOnlyList<string> problems = [];
+        for (var attempt = 0; attempt <= MaxRepairAttempts; attempt++)
+        {
+            var response = await llm.CompleteAsync(new LlmRequest(AnswerPrompt, messages, ContainsCaseData: true, MaxTokens: 3000), ct);
+            usage.Add(response);
+            var answer = response.Content?.Trim() ?? "";
+            var verification = CitationVerifier.Verify(answer, fetched);
+            if (verification.IsValid)
+            {
+                return usage.Answered(answer, verification, fetched);
+            }
+            problems = verification.Problems;
+            messages.Add(new LlmMessage(LlmRole.Assistant, answer));
+            messages.Add(LlmMessage.User(RepairMessage(problems)));
+        }
+        return usage.NoAnswer(problems);
+    }
+
+    private static string RepairMessage(IReadOnlyList<string> problems) =>
+        "الإجابة دي اترفضت في التحقق من المصادر:\n- " + string.Join("\n- ", problems) +
+        "\nصلّح الإجابة: استشهد بس بالمفاتيح اللي ظهرت في المصادر، والاقتباسات لازم تكون حرفية. " +
+        "لو مفيش سند كافي، قول كده من غير استشهادات وهتتسجل إن مفيش إجابة.";
+
+    private sealed class Usage
+    {
+        public int Input, Output;
+        public decimal Cost;
+        public string? Provider, Model;
+
+        public void Add(LlmResponse r)
+        {
+            Input += r.InputTokens;
+            Output += r.OutputTokens;
+            Cost += r.CostUsd;
+            (Provider, Model) = (r.Provider, r.Model);
+        }
+
+        public ResearchAnswer Answered(string answer, VerificationResult v, Dictionary<SourceKey, FetchedSource> fetched) => new(
+            true, answer,
+            v.Citations.Select(c => c.Key).Distinct().Select(k => new ResearchSource(k.ToString(), fetched[k].Title, fetched[k].Text)).ToList(),
+            [], Input, Output, Cost, Provider, Model);
+
+        public ResearchAnswer NoAnswer(IReadOnlyList<string> problems) =>
+            new(false, NoAnswerText, [], problems, Input, Output, Cost, Provider, Model);
+    }
+
+    public async Task<ResearchAnswer> AskAgentAsync(string question, CancellationToken ct = default)
     {
         var messages = new List<LlmMessage> { LlmMessage.User(question) };
         var fetched = new Dictionary<SourceKey, FetchedSource>();
@@ -125,10 +234,7 @@ public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
                 break;
             }
             messages.Add(new LlmMessage(LlmRole.Assistant, answer));
-            messages.Add(LlmMessage.User(
-                "الإجابة دي اترفضت في التحقق من المصادر:\n- " + string.Join("\n- ", problems) +
-                "\nصلّح الإجابة: استشهد بس بالمفاتيح اللي ظهرت في نتائج الأدوات، والاقتباسات لازم تكون حرفية. " +
-                "لو مفيش سند كافي، قول كده من غير استشهادات وهتتسجل إن مفيش إجابة."));
+            messages.Add(LlmMessage.User(RepairMessage(problems)));
         }
 
         return new ResearchAnswer(false, NoAnswerText, [], problems, input, output, cost, provider, model);
@@ -152,8 +258,8 @@ public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
             {
                 case "search_legislation":
                 {
-                    var hits = await search.SearchArticlesAsync(RequiredString(args, "query"), OptionalDate(args, "as_of_date"), 6, ct);
-                    return FormatArticles(hits, fetched);
+                    var hits = await search.SearchArticlesAsync(RequiredString(args, "query"), OptionalDate(args, "as_of_date"), 5, ct);
+                    return FormatArticles(hits, fetched, SearchExcerptLength);
                 }
                 case "get_article":
                 {
@@ -182,7 +288,8 @@ public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
         }
     }
 
-    private static string FormatArticles(IReadOnlyList<ArticleHit> hits, Dictionary<SourceKey, FetchedSource> fetched)
+    private static string FormatArticles(
+        IReadOnlyList<ArticleHit> hits, Dictionary<SourceKey, FetchedSource> fetched, int maxLength = int.MaxValue)
     {
         if (hits.Count == 0)
         {
@@ -193,12 +300,17 @@ public sealed class ResearchAgent(ILlmClient llm, LegalSearchService search)
         {
             var key = SourceKey.Article(h.LawId, h.ArticleNumber);
             var title = $"{h.LawTitle} — مادة {h.ArticleNumber}";
-            fetched[key] = new FetchedSource(key, title, h.Text);
+            var shown = h.Text.Length <= maxLength ? h.Text : h.Text[..maxLength] + " … (النص مقطوع؛ استخدم get_article للنص الكامل)";
+            // المصدر المسجّل للتحقق هو اللي النموذج شافه بس، عشان مايقتبسش من جزء ماشافوش.
+            if (!fetched.TryGetValue(key, out var existing) || existing.Text.Length < shown.Length)
+            {
+                fetched[key] = new FetchedSource(key, title, h.Text.Length <= maxLength ? h.Text : h.Text[..maxLength]);
+            }
             var validity = h.ValidTo is null
                 ? $"سارية من {h.ValidFrom:yyyy-MM-dd}"
                 : $"كانت سارية من {h.ValidFrom:yyyy-MM-dd} لحد {h.ValidTo:yyyy-MM-dd}";
             sb.AppendLine(CultureInfo.InvariantCulture, $"{key} {title} ({validity}) [law_id={h.LawId}]");
-            sb.AppendLine(h.Text).AppendLine();
+            sb.AppendLine(shown).AppendLine();
         }
         return sb.ToString();
     }

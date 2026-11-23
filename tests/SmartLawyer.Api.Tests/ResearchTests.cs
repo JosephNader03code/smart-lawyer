@@ -183,3 +183,61 @@ public class ResearchTests(DatabaseFixture fx) : IClassFixture<DatabaseFixture>,
         Assert.Equal("owner", (await db.Users.SingleAsync()).Role);
     }
 }
+
+public class RetrieveModeTests(DatabaseFixture fx) : IClassFixture<DatabaseFixture>
+{
+    private async Task<int> SeedAsync()
+    {
+        await using var db = fx.CreateContext(null);
+        return (await new LegalImportService(db).ImportLawAsync(new LawImportRequest(
+            "قانون تجريبي لوضع البحث", null, null, null, new DateOnly(2000, 1, 1),
+            "مادة 1\nكل خطأ سبب ضررا للغير يلزم من ارتكبه بالتعويض.\nمادة 2\nيلتزم البائع بتسليم المبيع."))).LawId;
+    }
+
+    [Fact]
+    public async Task Retrieve_UsesTwoSmallCalls_AndVerifiesCitations()
+    {
+        var lawId = await SeedAsync();
+        var llm = new FakeLlm(
+            FakeLlm.Text("خطأ ضرر للغير تعويض"),
+            FakeLlm.Text($"المتسبب ملزم بالتعويض [[article:{lawId}:1]] «كل خطأ سبب ضررا للغير يلزم من ارتكبه بالتعويض»."));
+        await using var db = fx.CreateContext(null);
+
+        var answer = await new ResearchAgent(llm, new LegalSearchService(db), ResearchMode.Retrieve)
+            .AskAsync("واحد خبط عربية جاري وكسرها، لازم يعوضه؟");
+
+        Assert.True(answer.Answered, string.Join("\n", answer.Problems));
+        Assert.Equal(2, llm.Requests.Count);
+        Assert.All(llm.Requests, r => Assert.Null(r.Tools));
+        Assert.Contains($"[[article:{lawId}:1]]", llm.Requests[1].Messages[0].Content); // المصادر اتبعتت مع السؤال
+    }
+
+    [Fact]
+    public async Task Retrieve_SkipsAnswerCallWhenNothingFound()
+    {
+        await SeedAsync();
+        var llm = new FakeLlm(FakeLlm.Text("كلمة غير موجودة إطلاقا زززز"));
+        await using var db = fx.CreateContext(null);
+
+        var answer = await new ResearchAgent(llm, new LegalSearchService(db), ResearchMode.Retrieve).AskAsync("سؤال ععععع");
+
+        Assert.False(answer.Answered);
+        Assert.Single(llm.Requests);
+    }
+
+    [Fact]
+    public async Task Retrieve_RepairsOnceThenAbstains()
+    {
+        await SeedAsync();
+        var llm = new FakeLlm(
+            FakeLlm.Text("خطأ ضرر تعويض"),
+            FakeLlm.Text("[[article:999:1]]"),
+            FakeLlm.Text("[[ruling:1:1]]"));
+        await using var db = fx.CreateContext(null);
+
+        var answer = await new ResearchAgent(llm, new LegalSearchService(db), ResearchMode.Retrieve).AskAsync("سؤال عن الخطأ والتعويض");
+
+        Assert.False(answer.Answered);
+        Assert.Equal(3, llm.Requests.Count);
+    }
+}

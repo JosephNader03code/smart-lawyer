@@ -5,7 +5,11 @@ using Microsoft.Extensions.DependencyInjection;
 using SmartLawyer.Core.Arabic;
 using SmartLawyer.Core.Legal;
 using SmartLawyer.Infrastructure;
+using Microsoft.Extensions.Logging.Abstractions;
 using SmartLawyer.Infrastructure.Import;
+using SmartLawyer.Infrastructure.Llm;
+using SmartLawyer.Infrastructure.Research;
+using SmartLawyer.Infrastructure.Search;
 using SmartLawyer.Infrastructure.Persistence;
 using SmartLawyer.Infrastructure.Persistence.Entities;
 using SmartLawyer.Infrastructure.Tenancy;
@@ -46,7 +50,7 @@ if (string.IsNullOrWhiteSpace(connectionString))
 }
 if (args.Length == 0)
 {
-    Console.Error.WriteLine("الأوامر: migrate | import-law | import-rulings");
+    Console.Error.WriteLine("الأوامر: migrate | preview-law | import-law | import-rulings | ask");
     return 1;
 }
 
@@ -104,6 +108,34 @@ try
             }
             Console.WriteLine($"تم: {ok}، فشل: {failed}");
             return failed == 0 ? 0 : 2;
+        }
+
+        case "ask":
+        {
+            // تجربة البحث الذكي على قاعدة البيانات الحالية (للمطورين). المفتاح من GROQ_API_KEY.
+            var provider = new LlmProviderOptions
+            {
+                Name = "cli",
+                BaseUrl = options.GetValueOrDefault("base-url") ?? "https://api.groq.com/openai/v1",
+                Model = options.GetValueOrDefault("model") ?? "openai/gpt-oss-120b",
+                AllowsCaseData = true,
+            };
+            var client = new OpenAiCompatibleClient(new HttpClient(), provider, Environment.GetEnvironmentVariable("GROQ_API_KEY"));
+            var mode = Enum.Parse<ResearchMode>(options.GetValueOrDefault("mode") ?? "Retrieve", ignoreCase: true);
+            var agent = new ResearchAgent(new LlmRouter([client], NullLogger<LlmRouter>.Instance), sp.GetRequiredService<LegalSearchService>(), mode);
+            var answer = await agent.AskAsync(Required(options, "question"));
+            Console.WriteLine(answer.Answered ? "✅ إجابة متحققة:" : "⚠️ مفيش سند كافي:");
+            Console.WriteLine(answer.Text);
+            foreach (var src in answer.Sources)
+            {
+                Console.WriteLine($"  {src.Key} {src.Title}");
+            }
+            foreach (var problem in answer.Problems)
+            {
+                Console.WriteLine($"  مشكلة: {problem}");
+            }
+            Console.WriteLine($"tokens: {answer.InputTokens} داخل / {answer.OutputTokens} خارج");
+            return 0;
         }
 
         default:
