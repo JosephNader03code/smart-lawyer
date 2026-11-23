@@ -1,17 +1,35 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
 import { Bell, Info, Menu, Plus, Scale, Search, X } from "lucide-react";
 import { navItems } from "./nav";
 import { SignOutButton } from "./SignOutButton";
 
 type Props = { children: React.ReactNode; userEmail: string | null; authEnabled: boolean };
 
-export function AppShell({ children, userEmail, authEnabled }: Props) {
+export function AppShell({ children, userEmail: serverEmail, authEnabled }: Props) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [clientEmail, setClientEmail] = useState<string | null>(null);
+  const userEmail = serverEmail ?? clientEmail;
+
+  // لو السيرفر مابعتش المستخدم (النسخة الثابتة)، بنجيبه من المتصفح، ولو مش مسجّل بنوديه لصفحة الدخول.
+  useEffect(() => {
+    if (!authEnabled || serverEmail) return;
+    let cancelled = false;
+    createClient().auth.getSession().then(({ data }) => {
+      if (cancelled) return;
+      if (data.session) setClientEmail(data.session.user.email ?? null);
+      else router.replace("/login");
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [authEnabled, serverEmail, router]);
 
   const sidebar = (
     <aside className="flex h-full w-64 flex-col justify-between border-l border-slate-800 bg-navy-950">

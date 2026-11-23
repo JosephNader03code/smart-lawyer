@@ -32,13 +32,18 @@ export function AuthForm({ mode }: { mode: "login" | "signup" }) {
         router.refresh();
       }
     } else {
-      const { error } = await supabase.auth.signUp({
+      const basePath = process.env.NEXT_PUBLIC_BASE_PATH ?? "";
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
+        options: { emailRedirectTo: `${window.location.origin}${basePath}/login/` },
       });
       if (error) setMessage({ kind: "error", text: error.message });
-      else setMessage({ kind: "info", text: "بعتنالك إيميل تأكيد. افتحه واضغط على اللينك عشان تفعّل حسابك." });
+      else if (data.session) {
+        // تأكيد الإيميل مقفول في فترة التجربة، فالحساب بيشتغل على طول.
+        router.push("/dashboard");
+        router.refresh();
+      } else setMessage({ kind: "info", text: "بعتنالك إيميل تأكيد. افتحه واضغط على اللينك عشان تفعّل حسابك." });
     }
     setLoading(false);
   }
