@@ -160,7 +160,7 @@ static void MapCaseEndpoints(WebApplication app)
     {
         if (file.Length > DocumentTextReader.MaxBytes)
         {
-            return Results.BadRequest(new { error = "الملف أكبر من 10 ميجا." });
+            return Results.BadRequest(new { error = "الملف أكبر من 4 ميجا." });
         }
         using var ms = new MemoryStream();
         await file.CopyToAsync(ms, ct);

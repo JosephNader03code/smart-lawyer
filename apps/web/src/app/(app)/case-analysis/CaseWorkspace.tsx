@@ -145,7 +145,7 @@ export function CaseWorkspace() {
             <p className="text-xs font-semibold text-slate-300">
               {busy === "upload" ? "بيتحلل... ممكن ياخد دقيقة" : "اضغط لاختيار مستندات القضية"}
             </p>
-            <p className="mt-1 text-[10px] text-slate-500">PDF فيه نص أو TXT، لحد 10 ميجا. الملف الأصلي مش بيتخزن، النص بس.</p>
+            <p className="mt-1 text-[10px] text-slate-500">PDF فيه نص أو TXT، لحد 4 ميجا. الملف الأصلي مش بيتخزن، النص بس.</p>
             <input type="file" accept=".pdf,.txt" multiple className="hidden" disabled={busy !== null} onChange={(e) => onUpload(e.target.files)} />
           </label>
         )}

@@ -9,7 +9,8 @@ public sealed class UnsupportedDocumentException(string message) : Exception(mes
 /// <summary>استخراج النص من المستندات المرفوعة (PDF فيه نص، أو ملف نصي). الملف الأصلي مابيتخزنش.</summary>
 public static class DocumentTextReader
 {
-    public const int MaxBytes = 10 * 1024 * 1024;
+    // 4 ميجا عشان الطلب كله (مع بيانات الرفع) يفضل تحت حد Vercel (4.5 ميجا).
+    public const int MaxBytes = 4 * 1024 * 1024;
 
     public static string Read(string fileName, byte[] content)
     {
@@ -20,7 +21,7 @@ public static class DocumentTextReader
         }
         if (content.Length > MaxBytes)
         {
-            throw new UnsupportedDocumentException("الملف أكبر من 10 ميجا.");
+            throw new UnsupportedDocumentException("الملف أكبر من 4 ميجا.");
         }
 
         string raw;
