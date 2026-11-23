@@ -154,6 +154,15 @@ smart-lawyer/
 - [ ] نقاط القوة والضعف، كل نقطة مربوطة بمصدر
 - **يخلص لما:** ملف قضية حقيقي يطلع منه timeline + تعارضات + تحليل بالمصادر.
 
+### إعداد Supabase (اتعمل)
+- [x] مشروع Supabase `vumferdiaclbwseifzxx` (London) متوصل، والجداول اتطبقت بالـ migrations
+- [x] كل الجداول في schema `app` مش `public`، عشان Supabase بيفتح `public` للمتصفح بالـ publishable key. أدوار `anon` و`authenticated` ماعندهاش أي صلاحية على `app` (اتأكدنا)
+- [x] Row-Level Security على 9 جداول خاصة بالمكاتب
+- [x] حساب `smartlawyer_api` للسيرفر (NOBYPASSRLS)، مقفول (NOLOGIN) لحد ما نحدد الباسورد وقت النشر في M6
+- [x] القانون المدني (1093 مادة) مرفوع والبحث شغال عليه
+- [ ] إعدادات تسجيل الدخول (Site URL وروابط التحويل) — وقت النشر في M6
+- ⚠️ **الـ Access Token بتاع Supabase اتكتب في الشات؛ لازم يتلغي بعد الإعداد** وأي إعداد جاي يتعمل بتوكن جديد عن طريق الـ form الآمن
+
 ### M5 — الـ Testing والتقييم
 - [ ] Unit tests لكل خوارزم في `Core` (هدف تغطية ≥ 90% لـ `Core`)
 - [ ] Integration tests للـ API على Postgres حقيقي (Testcontainers)

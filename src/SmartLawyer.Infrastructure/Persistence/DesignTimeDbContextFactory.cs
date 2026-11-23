@@ -12,7 +12,7 @@ public sealed class DesignTimeDbContextFactory : IDesignTimeDbContextFactory<App
         var cs = Environment.GetEnvironmentVariable("ConnectionStrings__Default")
             ?? "Host=localhost;Database=smartlawyer;Username=postgres;Password=postgres";
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(cs)
+            .UseNpgsql(cs, npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", AppDbContext.Schema))
             .UseSnakeCaseNamingConvention()
             .Options;
         return new AppDbContext(options, new FixedTenantContext(null));

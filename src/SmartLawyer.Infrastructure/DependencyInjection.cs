@@ -17,7 +17,9 @@ public static class DependencyInjection
     {
         services.AddScoped<TenantConnectionInterceptor>();
         services.AddDbContext<AppDbContext>((sp, options) => options
-            .UseNpgsql(connectionString, npgsql => npgsql.MigrationsAssembly(typeof(AppDbContext).Assembly.FullName))
+            .UseNpgsql(connectionString, npgsql => npgsql
+                .MigrationsAssembly(typeof(AppDbContext).Assembly.FullName)
+                .MigrationsHistoryTable("__EFMigrationsHistory", AppDbContext.Schema))
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(sp.GetRequiredService<TenantConnectionInterceptor>()));
         services.AddSingleton(new TenantDbContextFactory(connectionString));

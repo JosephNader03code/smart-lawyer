@@ -66,9 +66,9 @@ public sealed class DatabaseFixture : IAsyncLifetime
         await using var conn = new NpgsqlConnection(ConnectionString);
         await conn.OpenAsync();
         await Exec(conn, $"""
-            GRANT USAGE ON SCHEMA public TO {AppRole};
-            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO {AppRole};
-            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO {AppRole};
+            GRANT USAGE ON SCHEMA app TO {AppRole};
+            GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA app TO {AppRole};
+            GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA app TO {AppRole};
             """);
     }
 
@@ -76,7 +76,8 @@ public sealed class DatabaseFixture : IAsyncLifetime
     {
         var tenant = new FixedTenantContext(organizationId);
         var options = new DbContextOptionsBuilder<AppDbContext>()
-            .UseNpgsql(asAppRole ? AppConnectionString : ConnectionString)
+            .UseNpgsql(asAppRole ? AppConnectionString : ConnectionString,
+                npgsql => npgsql.MigrationsHistoryTable("__EFMigrationsHistory", AppDbContext.Schema))
             .UseSnakeCaseNamingConvention()
             .AddInterceptors(new TenantConnectionInterceptor(tenant))
             .Options;

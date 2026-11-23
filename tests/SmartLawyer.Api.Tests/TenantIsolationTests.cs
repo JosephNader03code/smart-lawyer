@@ -68,7 +68,7 @@ public class TenantIsolationTests(DatabaseFixture fx) : IClassFixture<DatabaseFi
         }
 
         // SQL مباشر من غير فلاتر EF: المكتب ب مايشوفش قضايا المكتب أ.
-        await using (var count = new NpgsqlCommand("SELECT count(*) FROM cases WHERE organization_id = @a", conn))
+        await using (var count = new NpgsqlCommand("SELECT count(*) FROM app.cases WHERE organization_id = @a", conn))
         {
             count.Parameters.AddWithValue("a", orgA);
             Assert.Equal(0L, await count.ExecuteScalarAsync());
@@ -76,7 +76,7 @@ public class TenantIsolationTests(DatabaseFixture fx) : IClassFixture<DatabaseFi
 
         // ومايقدرش يكتب قضية باسم المكتب أ.
         await using var insert = new NpgsqlCommand(
-            "INSERT INTO cases (id, organization_id, number, title, created_at) VALUES (@id, @a, 'X-2', 'تزوير', now())", conn);
+            "INSERT INTO app.cases (id, organization_id, number, title, created_at) VALUES (@id, @a, 'X-2', 'تزوير', now())", conn);
         insert.Parameters.AddWithValue("id", Guid.NewGuid());
         insert.Parameters.AddWithValue("a", orgA);
         var ex = await Assert.ThrowsAsync<PostgresException>(() => insert.ExecuteNonQueryAsync());

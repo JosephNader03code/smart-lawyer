@@ -8,6 +8,11 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 {
     public const string SearchConfig = "simple";
 
+    /// <summary>
+    /// كل جداولنا في schema اسمه app مش public، عشان Supabase بيفتح public للمتصفح (Data API) بالـ publishable key.
+    /// </summary>
+    public const string Schema = "app";
+
     // بيانات قانونية عامة
     public DbSet<Law> Laws => Set<Law>();
     public DbSet<Article> Articles => Set<Article>();
@@ -33,6 +38,7 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
 
     protected override void OnModelCreating(ModelBuilder b)
     {
+        b.HasDefaultSchema(Schema);
         b.Entity<Law>(e =>
         {
             e.Property(x => x.Title).HasMaxLength(500);
