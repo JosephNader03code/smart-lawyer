@@ -225,6 +225,15 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("predicate");
 
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("quote");
+
+                    b.Property<string>("RawTimeText")
+                        .HasColumnType("text")
+                        .HasColumnName("raw_time_text");
+
                     b.Property<Guid?>("SourceDocumentId")
                         .HasColumnType("uuid")
                         .HasColumnName("source_document_id");
@@ -238,8 +247,8 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("subject");
 
-                    b.Property<DateTimeOffset?>("Time")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<DateTime?>("Time")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("time");
 
                     b.HasKey("Id")
@@ -271,6 +280,10 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("timestamp with time zone")
                         .HasColumnName("created_at");
+
+                    b.Property<string>("Error")
+                        .HasColumnType("text")
+                        .HasColumnName("error");
 
                     b.Property<string>("ExtractedText")
                         .HasColumnType("text")
@@ -326,13 +339,27 @@ namespace SmartLawyer.Infrastructure.Persistence.Migrations
                         .HasColumnType("text")
                         .HasColumnName("description");
 
-                    b.Property<DateTimeOffset?>("OccurredAt")
-                        .HasColumnType("timestamp with time zone")
+                    b.Property<bool>("HasTime")
+                        .HasColumnType("boolean")
+                        .HasColumnName("has_time");
+
+                    b.Property<string>("Kind")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("kind");
+
+                    b.Property<DateTime?>("OccurredAt")
+                        .HasColumnType("timestamp without time zone")
                         .HasColumnName("occurred_at");
 
                     b.Property<Guid>("OrganizationId")
                         .HasColumnType("uuid")
                         .HasColumnName("organization_id");
+
+                    b.Property<string>("Quote")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("quote");
 
                     b.Property<string>("RawDateText")
                         .IsRequired()

@@ -77,6 +77,8 @@ public class CitationVerifierTests
     [InlineData("المتعاقدين، فلا", true)]
     [InlineData("شريعه المتعاقدين", true)]
     [InlineData("المتعاقد", false)] // جزء من كلمة مش كفاية
+    [InlineData("لا يجوز نقضه", true)]      // "فلا" في النص: حرف العطف اتشال من أول كلمة
+    [InlineData("شريعة لا يجوز", false)]    // بس في أول كلمة، مش في النص
     [InlineData("", false)]
     public void QuoteAppearsIn_MatchesWholeWordsAfterNormalization(string quote, bool expected) =>
         Assert.Equal(expected, CitationVerifier.QuoteAppearsIn(quote, "العقد شريعة المتعاقدين، فلا يجوز نقضه"));

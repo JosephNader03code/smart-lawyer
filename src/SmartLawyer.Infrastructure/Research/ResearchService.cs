@@ -12,6 +12,7 @@ public sealed class QuotaOptions
 {
     public const string Section = "Quotas";
     public int QuestionsPerDay { get; set; } = 15;
+    public int AnalysesPerDay { get; set; } = 3;
 }
 
 public sealed class QuotaExceededException(int limit) : Exception($"وصلت للحد اليومي ({limit} سؤال). الحد بيتجدد بكرة.")

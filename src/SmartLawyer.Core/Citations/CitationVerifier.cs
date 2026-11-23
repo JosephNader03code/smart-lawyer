@@ -76,15 +76,35 @@ public static partial class CitationVerifier
         return new VerificationResult(problems.Count == 0, citations, problems);
     }
 
-    /// <summary>مقارنة بعد توحيد النص وتجاهل علامات الترقيم، عشان اختلاف الهمزة أو الفاصلة مايفشلش اقتباس صحيح.</summary>
+    /// <summary>
+    /// مقارنة بعد توحيد النص وتجاهل علامات الترقيم، عشان اختلاف الهمزة أو الفاصلة مايفشلش اقتباس صحيح.
+    /// النماذج كتير بتشيل حرف العطف من أول كلمة ("وكان" ← "كان")، فأول كلمة بس مسموح تبقى ناقصة "و" أو "ف".
+    /// </summary>
     public static bool QuoteAppearsIn(string quote, string sourceText)
     {
-        var q = string.Join(' ', SearchQueryBuilder.Tokenize(quote));
-        if (q.Length == 0)
+        var q = SearchQueryBuilder.Tokenize(quote).ToList();
+        if (q.Count == 0)
         {
             return false;
         }
-        var s = string.Join(' ', SearchQueryBuilder.Tokenize(sourceText));
-        return $" {s} ".Contains($" {q} ", StringComparison.Ordinal);
+        var s = SearchQueryBuilder.Tokenize(sourceText).ToList();
+        for (var i = 0; i + q.Count <= s.Count; i++)
+        {
+            var first = s[i];
+            if (first != q[0] && first != "و" + q[0] && first != "ف" + q[0])
+            {
+                continue;
+            }
+            var match = true;
+            for (var k = 1; k < q.Count && match; k++)
+            {
+                match = s[i + k] == q[k];
+            }
+            if (match)
+            {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -24,7 +24,8 @@ public sealed record LlmRequest(
     IReadOnlyList<LlmMessage> Messages,
     bool ContainsCaseData,
     IReadOnlyList<LlmTool>? Tools = null,
-    int MaxTokens = 2048);
+    int MaxTokens = 2048,
+    bool JsonOutput = false);
 
 public sealed record LlmResponse(
     string? Content,

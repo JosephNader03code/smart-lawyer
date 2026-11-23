@@ -63,3 +63,35 @@ public class LiveResearchTests(DatabaseFixture fx) : IClassFixture<DatabaseFixtu
         Assert.NotEmpty(answer.Sources);
     }
 }
+
+public class LiveExtractionTests
+{
+    // مستند تجريبي مكتوب للاختبار (مش مستند حقيقي).
+    private const string Doc = """
+        محضر استلام بضاعة
+        إنه في يوم الخميس الموافق 28/8/2025 حضر السائق محمود حسن إلى مقر شركة الأمل للتوريدات،
+        وأفاد السائق بأن الوصول للموقع كان في تمام الساعة 10:30 مساءً، وتم تسليم 400 كرتونة.
+        وقيمة الشحنة طبقاً للفاتورة رقم 77 مبلغ 1,250,000 جنيه.
+        وكان عقد التوريد رقم 402 قد وُقّع بتاريخ 10 مارس 2025 بين الطرفين.
+        """;
+
+    [LiveFact]
+    public async Task RealModel_ExtractsVerifiedEventsAndFacts()
+    {
+        var provider = new LlmProviderOptions
+        {
+            Name = "live",
+            BaseUrl = Environment.GetEnvironmentVariable("LIVE_LLM_BASE_URL") ?? "https://api.groq.com/openai/v1",
+            Model = Environment.GetEnvironmentVariable("LIVE_LLM_MODEL")!,
+            AllowsCaseData = true,
+        };
+        var client = new OpenAiCompatibleClient(new HttpClient(), provider, Environment.GetEnvironmentVariable("GROQ_API_KEY"));
+        var result = await new SmartLawyer.Infrastructure.CaseAnalysis.FactExtractor(new LlmRouter([client], NullLogger<LlmRouter>.Instance)).ExtractAsync(Doc);
+
+        var report = string.Join("\n", result.Events.Select(e => $"EVENT {e.Kind} {e.Date:yyyy-MM-dd HH:mm} hasTime={e.HasTime} | {e.Title} | «{e.Quote}»"))
+                     + "\n" + string.Join("\n", result.Facts.Select(f => $"FACT {f.Predicate} {f.Subject} time={f.Time:yyyy-MM-dd HH:mm} amount={f.Amount} | «{f.Quote}»"))
+                     + $"\nrejected={result.Rejected}: " + string.Join(" | ", result.RejectionReasons) + $"\ntokens={result.InputTokens}/{result.OutputTokens}";
+        await File.WriteAllTextAsync(Path.Combine(Path.GetTempPath(), "live-extraction.txt"), report);
+        Assert.NotEmpty(result.Events);
+    }
+}

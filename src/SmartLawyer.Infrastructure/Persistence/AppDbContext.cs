@@ -91,11 +91,14 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options, ITenant
         b.Entity<CaseDocument>(e => e.Property(x => x.Status).HasConversion<string>().HasMaxLength(20));
         b.Entity<CaseEvent>(e =>
         {
+            // وقت محلي زي ما اتكتب في المستند، من غير منطقة زمنية.
+            e.Property(x => x.OccurredAt).HasColumnType("timestamp without time zone");
             e.HasOne<LegalCase>().WithMany().HasForeignKey(x => x.CaseId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CaseDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.SetNull);
         });
         b.Entity<CaseClaim>(e =>
         {
+            e.Property(x => x.Time).HasColumnType("timestamp without time zone");
             e.HasOne<LegalCase>().WithMany().HasForeignKey(x => x.CaseId).OnDelete(DeleteBehavior.Cascade);
             e.HasOne<CaseDocument>().WithMany().HasForeignKey(x => x.SourceDocumentId).OnDelete(DeleteBehavior.SetNull);
         });

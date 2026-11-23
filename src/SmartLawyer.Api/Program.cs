@@ -1,6 +1,7 @@
 using System.Globalization;
 using SmartLawyer.Api.Auth;
 using SmartLawyer.Infrastructure;
+using SmartLawyer.Infrastructure.CaseAnalysis;
 using SmartLawyer.Infrastructure.Llm;
 using SmartLawyer.Infrastructure.Persistence;
 using SmartLawyer.Infrastructure.Persistence.Entities;
@@ -48,6 +49,7 @@ if (hasDatabase)
     MapLegalEndpoints(app);
     MapAccountEndpoints(app);
     MapResearchEndpoints(app);
+    MapCaseEndpoints(app);
 }
 else
 {
@@ -135,6 +137,62 @@ static void MapResearchEndpoints(WebApplication app)
     }).RequireAuthorization();
 }
 
+static void MapCaseEndpoints(WebApplication app)
+{
+    var cases = app.MapGroup("/api/cases").RequireAuthorization();
+
+    cases.MapPost("/", async (CreateCaseRequest r, CaseAnalysisService svc, CancellationToken ct) =>
+    {
+        var title = r.Title?.Trim() ?? "";
+        if (title.Length is < 3 or > 300)
+        {
+            return Results.BadRequest(new { error = "عنوان القضية لازم يكون بين 3 و300 حرف." });
+        }
+        return Results.Ok(await svc.CreateCaseAsync(title, r.Number, r.Type, r.Description, ct));
+    });
+
+    cases.MapGet("/", async (CaseAnalysisService svc, CancellationToken ct) => Results.Ok(await svc.ListCasesAsync(ct)));
+
+    cases.MapGet("/{id:guid}/documents", (Guid id, CaseAnalysisService svc, CancellationToken ct) =>
+        Handle(() => svc.ListDocumentsAsync(id, ct)));
+
+    cases.MapPost("/{id:guid}/documents", async (Guid id, IFormFile file, RequestTenantContext tenant, CaseAnalysisService svc, CancellationToken ct) =>
+    {
+        if (file.Length > DocumentTextReader.MaxBytes)
+        {
+            return Results.BadRequest(new { error = "الملف أكبر من 10 ميجا." });
+        }
+        using var ms = new MemoryStream();
+        await file.CopyToAsync(ms, ct);
+        return await Handle(() => svc.AddDocumentAsync(tenant.UserId!.Value, id, file.FileName, ms.ToArray(), ct));
+    }).DisableAntiforgery();
+
+    cases.MapPost("/{id:guid}/documents/{documentId:guid}/reanalyze", (Guid id, Guid documentId, RequestTenantContext tenant, CaseAnalysisService svc, CancellationToken ct) =>
+        Handle(() => svc.ReanalyzeAsync(tenant.UserId!.Value, id, documentId, ct)));
+
+    cases.MapGet("/{id:guid}/timeline", (Guid id, CaseAnalysisService svc, CancellationToken ct) =>
+        Handle(() => svc.GetTimelineAsync(id, ct)));
+
+    cases.MapGet("/{id:guid}/contradictions", (Guid id, CaseAnalysisService svc, CancellationToken ct) =>
+        Handle(() => svc.GetContradictionsAsync(id, ct)));
+}
+
+static async Task<IResult> Handle<T>(Func<Task<T>> action)
+{
+    try
+    {
+        return Results.Ok(await action());
+    }
+    catch (CaseNotFoundException)
+    {
+        return Results.NotFound(new { error = "القضية أو المستند مش موجود." });
+    }
+    catch (UnsupportedDocumentException ex)
+    {
+        return Results.BadRequest(new { error = ex.Message });
+    }
+}
+
 static IResult? ValidateQuery(string q) =>
     q.Length > LegalSearchService.MaxQueryLength
         ? Results.BadRequest(new { error = $"السؤال أطول من {LegalSearchService.MaxQueryLength} حرف" })
@@ -156,6 +214,8 @@ static bool TryParseDate(string? value, out DateOnly? date)
 }
 
 public sealed record AskRequest(string? Question);
+
+public sealed record CreateCaseRequest(string? Title, string? Number, string? Type, string? Description);
 
 // Exposed for integration tests (WebApplicationFactory).
 public partial class Program;

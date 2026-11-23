@@ -31,6 +31,8 @@ public static class DependencyInjection
             sp.GetRequiredService<ILlmClient>(), sp.GetRequiredService<LegalSearchService>(),
             sp.GetRequiredService<ResearchOptions>().Mode));
         services.AddScoped<ResearchService>();
+        services.AddScoped<CaseAnalysis.FactExtractor>();
+        services.AddScoped<CaseAnalysis.CaseAnalysisService>();
         services.AddSingleton(TimeProvider.System);
         return services;
     }

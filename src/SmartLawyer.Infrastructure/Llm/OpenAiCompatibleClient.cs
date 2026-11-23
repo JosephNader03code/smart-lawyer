@@ -95,6 +95,10 @@ public sealed class OpenAiCompatibleClient(HttpClient http, LlmProviderOptions p
             ["max_tokens"] = request.MaxTokens,
             ["temperature"] = 0.1,
         };
+        if (request.JsonOutput)
+        {
+            body["response_format"] = new JsonObject { ["type"] = "json_object" };
+        }
         if (request.Tools is { Count: > 0 })
         {
             body["tools"] = new JsonArray(request.Tools.Select(t => (JsonNode)new JsonObject

@@ -47,6 +47,7 @@ public sealed class CaseDocument : ITenantOwned
     public int Pages { get; set; }
     public DocumentStatus Status { get; set; }
     public string? ExtractedText { get; set; }
+    public string? Error { get; set; }
     public DateTimeOffset CreatedAt { get; set; }
 }
 
@@ -56,10 +57,19 @@ public sealed class CaseEvent : ITenantOwned
     public Guid Id { get; set; }
     public Guid OrganizationId { get; set; }
     public Guid CaseId { get; set; }
-    public DateTimeOffset? OccurredAt { get; set; }
+    /// <summary>الوقت المحلي زي ما اتكتب في المستند (من غير منطقة زمنية). محسوب بالكود من RawDateText.</summary>
+    public DateTime? OccurredAt { get; set; }
+
+    /// <summary>true لو المستند ذكر الساعة، false لو التاريخ بس (يعني الحدث في أي وقت خلال اليوم).</summary>
+    public bool HasTime { get; set; }
+
     public required string RawDateText { get; set; }     // التاريخ زي ما اتكتب في المستند
+    public required string Kind { get; set; }            // signing / delivery / notice / incident / payment / other
     public required string Title { get; set; }
     public string? Description { get; set; }
+
+    /// <summary>جملة منقولة حرفياً من المستند بتثبت الحدث.</summary>
+    public required string Quote { get; set; }
     public Guid? SourceDocumentId { get; set; }
     public string? SourceLocation { get; set; }
 }
@@ -73,9 +83,13 @@ public sealed class CaseClaim : ITenantOwned
     public required string Subject { get; set; }
     public required string Predicate { get; set; }
     public string? ObjectValue { get; set; }
-    public DateTimeOffset? Time { get; set; }
+    public DateTime? Time { get; set; }
+    public string? RawTimeText { get; set; }
     public string? Place { get; set; }
     public decimal? Amount { get; set; }
+
+    /// <summary>جملة منقولة حرفياً من المستند بتثبت الواقعة.</summary>
+    public required string Quote { get; set; }
     public Guid? SourceDocumentId { get; set; }
     public string? SourceLocation { get; set; }
 }
