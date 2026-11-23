@@ -103,4 +103,12 @@ public class LawTextSplitterTests
         var only = Assert.Single(LawTextSplitter.Split(text));
         Assert.Contains("المادة 3 من هذا القانون", only.Text);
     }
+
+    [Fact]
+    public void Split_PrefixesNumberedIssuanceArticles()
+    {
+        const string text = "مادة 1\nيلغى القانون القديم.\nمادة 2\nينشر.\nمادة 1\nأول مادة.\nمادة 2\nتاني مادة.";
+
+        Assert.Equal(["إصدار 1", "إصدار 2", "1", "2"], LawTextSplitter.Split(text).Select(a => a.Number));
+    }
 }

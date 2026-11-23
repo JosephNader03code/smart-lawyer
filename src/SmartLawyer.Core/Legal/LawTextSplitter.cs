@@ -55,7 +55,25 @@ public static partial class LawTextSplitter
             }
         }
         Flush();
-        return articles;
+        return MarkIssuanceArticles(articles);
+    }
+
+    /// <summary>
+    /// قوانين كتير بتبدأ بمواد إصدار مرقمة 1، 2، ... وبعدها القانون نفسه بيبدأ من مادة 1 تاني.
+    /// لو الترقيم رجع لـ 1، المواد اللي قبله بتتسمى "إصدار 1"، "إصدار 2"، ... عشان ماتتلخبطش مع مواد القانون.
+    /// </summary>
+    private static List<LawArticle> MarkIssuanceArticles(List<LawArticle> articles)
+    {
+        if (articles.Count < 2)
+        {
+            return articles;
+        }
+        var restart = articles.FindIndex(1, a => a.Number == "1");
+        if (restart <= 0 || articles[0].Number != "1")
+        {
+            return articles;
+        }
+        return articles.Select((a, i) => i < restart ? a with { Number = $"إصدار {a.Number}" } : a).ToList();
     }
 
     private static bool TryParseHeading(string line, out string number, out string rest)
